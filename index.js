@@ -4,9 +4,9 @@ var duplex = require('duplex')
 var inherits = require('util').inherits
 var serializer = require('stream-serializer')
 var u = require('./util')
-var timestamp = require('monotonic-timestamp')
+var timestamp = require('vector-clock-class')
 
-exports = 
+exports =
 module.exports = Scuttlebutt
 
 exports.createID = u.createID
@@ -45,6 +45,8 @@ function Scuttlebutt (opts) {
   } else {
     this.setId(id || u.createId())
   }
+
+  this.clock = timestamp(this.id, 0)
 }
 
 var sb = Scuttlebutt.prototype
@@ -55,7 +57,7 @@ sb.applyUpdate = dutyOfSubclass
 sb.history      = dutyOfSubclass
 
 sb.localUpdate = function (trx) {
-  this._update([trx, timestamp(), this.id])
+  this._update([trx, this.clock.update(this.id), this.id])
   return this
 }
 
@@ -68,6 +70,9 @@ sb._update = function (update) {
   //order. each node must emit it's changes in order!
   //emit an 'old_data' event because i'll want to track how many
   //unnecessary messages are sent.
+
+  // update vector clock
+  this.clock.update(source, ts)
 
   var latest = this.sources[source]
   if(latest && latest >= ts)
