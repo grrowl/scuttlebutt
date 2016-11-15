@@ -41,7 +41,17 @@ require('tape')('sync on reused stream', function(t) {
     // Set value offline
     g1.set('key', value2)
 
-    // re-connect with existing socket to new scuttlebutt
+    // re-connect with existing stream to new scuttlebutt
+    s1 = g1.createStream()
+    s3 = g3.createStream()
+
+    s1.on('data', function(d) {
+      console.log("s1~", d)
+    })
+    s3.on('data', function(d) {
+      console.log("s3~", d)
+    })
+
     s1.pipe(s3).pipe(s1)
 
     setTimeout(function () {
