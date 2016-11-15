@@ -31,19 +31,18 @@ inherits(Scuttlebutt, EventEmitter)
 function Scuttlebutt(opts) {
 
   if (!(this instanceof Scuttlebutt)) return new Scuttlebutt(opts)
+
   var id = 'string' === typeof opts ? opts : opts && opts.id
+
   this.sources = {}
   this.setMaxListeners(Number.MAX_VALUE)
-    //count how many other instances we are replicating to.
-  this._streams = 0
-  if (opts && opts.sign && opts.verify) {
-    this.setId(opts.id || opts.createId())
-    this._sign = opts.sign
-    this._verify = opts.verify
-  } else {
-    this.setId(id || u.createId())
-  }
 
+  // count how many other instances we are replicating to.
+  this._streams = 0
+
+  this.setId(id || u.createId())
+
+  // initialise
   this.clock = timestamp(this.id, 0)
 }
 
@@ -55,19 +54,19 @@ sb.applyUpdate = dutyOfSubclass
 sb.history = dutyOfSubclass
 
 sb.localUpdate = function(trx) {
-  this._update([trx, this.clock.update(this.id), this.id])
+  this._update([ trx, this.clock.update(this.id), this.id ])
   return this
 }
 
 sb._update = function(update) {
-  //validated when it comes into the stream
+  // validated when it comes into the stream
   var ts = update[1]
   var source = update[2]
 
-  //if this message is old for it's source, ignore it. it's out of
-  //order. each node must emit it's changes in order!
-  //emit an 'old_data' event because i'll want to track how many
-  //unnecessary messages are sent.
+  // if this message is old for it's source, ignore it. it's out of
+  // order. each node must emit it's changes in order!
+  // emit an 'old_data' event because i'll want to track how many
+  // unnecessary messages are sent.
 
   // update vector clock
   this.clock.update(source, ts)
@@ -80,53 +79,36 @@ sb._update = function(update) {
 
   var self = this
 
-  function didVerification(err, verified) {
+  // we removed the message signing/verification from here.
+  /*
+  if (err)
+    return emit.call(self, 'error', err)
 
-    // I'm not sure how what should happen if a async verification
-    // errors. if it's an key not found - that is a verification fail,
-    // not a error. if it's genunie error, really you should queue and
-    // try again? or replay the message later
-    // -- this should be done my the security plugin though, not scuttlebutt.
+  if (!verified)
+    return emit.call(self, 'unverified_data', update)
+  */
 
-    if (err)
-      return emit.call(self, 'error', err)
-
-    if (!verified)
-      return emit.call(self, 'unverified_data', update)
-
-    if (self.applyUpdate(update))
-      emit.call(self, '_update', update) //write to stream.
-  }
-
-  if (source !== this.id) {
-    if (this._verify)
-      this._verify(update, didVerification)
-    else
-      didVerification(null, true)
-  } else {
-    if (this._sign) {
-      //could make this async easily enough.
-      update[3] = this._sign(update)
-    }
-    didVerification(null, true)
+  if (self.applyUpdate(update)) {
+    emit.call(self, '_update', update) //write to stream.
   }
 
   return true
 }
 
+// 158 lines. oof.
 sb.createStream = function(opts) {
   var self = this
     //the sources for the remote end.
-  var sources = {},
-    other
-  var syncSent = false,
-    syncRecv = false
+  var sources = {}
+  var syncSent = false, syncRecv = false
 
   this._streams++
 
-    opts = opts || {}
+  opts = opts || {}
+
   var d = duplex()
   d.name = opts.name
+
   var outer = serializer(opts && opts.wrapper)(d)
   outer.inner = d
 
@@ -139,9 +121,9 @@ sb.createStream = function(opts) {
   var tail = opts.tail !== false //default to tail=true
 
   function start(data) {
-    //when the digest is recieved from the other end,
-    //send the history.
-    //merge with the current list of sources.
+    // when the digest is recieved from the other end,
+    // send the history.
+    // merge with the current list of sources.
     if (!data || !data.clock) {
       d.emit('error');
       return d._end()
@@ -166,44 +148,60 @@ sb.createStream = function(opts) {
 
     d._data('SYNC')
     syncSent = true
-      //when we have sent all history
+
+    // when we have sent all history
     outer.emit('header', data)
     outer.emit('syncSent')
-      //when we have recieved all histoyr
-      //emit 'synced' when this stream has synced.
-    if (syncRecv) outer.emit('sync'), outer.emit('synced')
-    if (!tail) d._end()
+
+    // when we have recieved all histoyr
+    // emit 'synced' when this stream has synced.
+    if (syncRecv) {
+      outer.emit('sync')
+      outer.emit('synced')
+    }
+
+    if (!tail)
+      d._end()
   }
 
-  d
-    .on('_data', function(data) {
-      //if it's an array, it's an update.
+  d.on('_data', function(data) {
+      // if it's an array, it's an update.
       if (Array.isArray(data)) {
-        //check whether we are accepting writes.
-        if (!d.writable)
+        // check whether we are accepting writes.
+        if (!d.writable) {
           return
-        if (validate(data))
+        }
+        if (validate(data)) {
           return self._update(data)
-      }
-      //if it's an object, it's a scuttlebut digest.
-      else if ('object' === typeof data && data)
+        }
+      } else if ('object' === typeof data && data) {
+        // if it's an object, it's a scuttlebut digest.
         start(data)
-      else if ('string' === typeof data && data == 'SYNC') {
+      } else if ('string' === typeof data && data == 'SYNC') {
         syncRecv = true
         outer.emit('syncRecieved')
-        if (syncSent) outer.emit('sync'), outer.emit('synced')
+
+        if (syncSent) {
+          outer.emit('sync')
+          outer.emit('synced')
+        }
       }
-    }).on('_end', function() {
-      d._end()
     })
-    .on('close', function() {
-      self.removeListener('_update', onUpdate)
-      self.removeListener('dispose', dispose)
-        //emit the number of streams that are remaining...
-        //this will be used for memory management...
-      self._streams--
-        emit.call(self, 'unstream', self._streams)
-    })
+
+  d.on('_end', function() {
+    d._end()
+  })
+
+  d.on('close', function() {
+    self.removeListener('_update', onUpdate)
+    self.removeListener('dispose', dispose)
+
+    // emit the number of streams that are remaining...
+    // this will be used for memory management...
+    self._streams--
+
+    emit.call(self, 'unstream', self._streams)
+  })
 
   if (opts && opts.tail === false) {
     outer.on('sync', function() {
@@ -229,13 +227,17 @@ sb.createStream = function(opts) {
     d.end()
   }
 
-  var outgoing = {
-      id: self.id,
-      clock: self.sources
-    }
-    // var outgoing = this.clock
+  // classic mode:
+  // var outgoing = {
+  //   id: self.id,
+  //   clock: self.sources
+  // }
+  // vector clock
+  var outgoing = this.clock
 
-  if (opts && opts.meta) outgoing.meta = opts.meta
+  if (opts && opts.meta) {
+    outgoing.meta = opts.meta
+  }
 
   if (d.readable) {
     d._data(outgoing)
@@ -295,7 +297,7 @@ function streamDone(stream, listener) {
     listener.call(this, arg)
   }
 
-  //this makes emitter.removeListener(event, listener) still work
+  // this makes emitter.removeListener(event, listener) still work
   onDone.listener = listener
 
   stream.on('end', onDone)
@@ -303,8 +305,8 @@ function streamDone(stream, listener) {
   stream.on('close', onDone)
 }
 
-//create another instance of this scuttlebutt,
-//that is in sync and attached to this instance.
+// create another instance of this scuttlebutt,
+// that is in sync and attached to this instance.
 sb.clone = function() {
   var A = this
   var B = new(A.constructor)
@@ -328,7 +330,8 @@ sb.clone = function() {
   })
 
   a.pipe(b).pipe(a)
-    //resume both streams, so that the new instance is brought up to date immediately.
+
+  // resume both streams, so that the new instance is brought up to date immediately.
   a.resume()
   b.resume()
 
