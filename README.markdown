@@ -2,14 +2,18 @@
 
 A base-class for real-time replication.
 
-[![travis](https://secure.travis-ci.org/dominictarr/scuttlebutt.png?branch=master)](https://travis-ci.org/dominictarr/scuttlebutt)
+[![travis](https://secure.travis-ci.org/grrowl/scuttlebutt.png?branch=master)](https://travis-ci.org/grrowl/scuttlebutt)
 
-[![browser support](http://ci.testling.com/dominictarr/scuttlebutt.png)](http://ci.testling.com/dominictarr/scuttlebutt)
+[![browser support](http://ci.testling.com/grrowl/scuttlebutt.png)](http://ci.testling.com/grrowl/scuttlebutt)
 
 This seems like a silly name, but I assure you, this is real science. 
 Read this: http://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf 
 
 Or, if you're lazy: http://en.wikipedia.org/wiki/Scuttlebutt (laziness will get you nowhere, btw)
+
+**scuttlebutt-vector** is a fork of [scuttlebutt](https://github.com/dominictarr/scuttlebutt) but
+uses [vector-clock-class](https://github.com/AWinterman/vector-clock) instead of
+`monotonic-timestamp`.
 
 ## secure-scuttlebutt
 
