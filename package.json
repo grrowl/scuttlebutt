@@ -3,10 +3,10 @@
   "name": "scuttlebutt-vector",
   "description": "replicate data via scuttlebutt protocol (using vector clocks)",
   "version": "6.0.0",
-  "homepage": "https://github.com/dominictarr/scuttlebutt",
+  "homepage": "https://github.com/grrowl/scuttlebutt",
   "repository": {
     "type": "git",
-    "url": "git://github.com/dominictarr/scuttlebutt.git"
+    "url": "git://github.com/grrowl/scuttlebutt.git"
   },
   "dependencies": {
     "duplex": "~1.0.0",
